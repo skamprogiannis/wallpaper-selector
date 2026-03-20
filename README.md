@@ -27,7 +27,7 @@ If you dont want to use the setup script you can git clone and edit scripts on s
 
 Scripts on scripts folder is as is copied pasted from what I use except 2 lines that hook up css generating scripts of mine dont expect for them to work out of box they are there for ease of copying and editing incase install script fails.
 
-Compositor compability:
+Compositor compatibility:
 Works in hyprland didnt test other compositors but it should work as long as it can detect your monitor and is wayland (I dont have intentions to add x11 support unless too many request the support shouldnt be too hard but I dont use x11 if someone adds a patch I will merge).
 
 
