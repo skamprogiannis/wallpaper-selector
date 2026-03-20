@@ -23,10 +23,9 @@ git clone https://github.com/Aino-Chan/wallpaper-selector.git
 cd wallpaper-selector
 ./setup.sh
 ```
-If you dont want to do that you can copy and edit scripts on scripts folder and copy them to ~/.local/bin and quickshell files to ~/.config/quickshell/ and edit freely if you lack dependencies that wont work so install script is recommended.
+If you dont want to use the setup script you can git clone and edit scripts on scripts folder and copy them to ~/.local/bin and quickshell files to ~/.config/quickshell/ and edit freely if you lack dependencies that wont work so install script is recommended.
 
 Scripts on scripts folder is as is copied pasted from what I use except 2 lines that hook up css generating scripts of mine dont expect for them to work out of box they are there for ease of copying and editing incase install script fails.
-Automatic color change on the wallpaper selector 
 
 Compositor compability:
 Works in hyprland didnt test other compositors but it should work as long as it can detect your monitor and is wayland (I dont have intentions to add x11 support unless too many request the support shouldnt be too hard but I dont use x11 if someone adds a patch I will merge).
