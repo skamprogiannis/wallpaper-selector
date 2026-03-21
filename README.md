@@ -14,7 +14,7 @@ ffmpeg, linux-wallpaper-engine, quickshell, pywal, swww
 and dependencies of everything listed here as expected
 
 Above dependecies are for plug and play behavior you can substitute pywal and sww dependecies
-easily by changing wallpaper-apply.sh and wallpaper-apply-static.sh and using other tools
+easily by changing wallpaper-apply.sh and wallpaper-apply-static.sh and changing the color read location of Theme.qml and using other tools
 I cant add check for every tool and their locations if someone else does it they are welcome.
 
 Installation:
