@@ -147,28 +147,6 @@ chmod +x \
 info "Scripts installed to $BIN_DIR"
 
 heading "Pywal theme integration..."
-
-if [[ -n "$WAL_CMD" ]]; then
-    WAL_TEMPLATES_DIR="$HOME/.config/wal/templates"
-    mkdir -p "$WAL_TEMPLATES_DIR"
-
-    cat > "$WAL_TEMPLATES_DIR/Theme.qml" << 'TEMPLATE'
-    pragma Singleton
-    import QtQuick
-    QtObject {{
-        property color background: "#B2{color0.strip}"
-        property color background90: "#E6{color0.strip}"
-        property color border: "{color12}"
-        property color accent: "#B2{color1.strip}"
-        property color text: "{foreground}"
-    }}
-TEMPLATE
-
-    info "Wal template installed to $WAL_TEMPLATES_DIR/Theme.qml"
-
-    ln -sf "$HOME/.cache/wal/Theme.qml" "$CONFIG_DIR/Theme.qml"
-    info "Symlinked ~/.cache/wal/Theme.qml → $CONFIG_DIR/Theme.qml"
-
     info "Running wal to generate initial theme..."
     $WAL_CMD -R -n -q 2>/dev/null || true
 else

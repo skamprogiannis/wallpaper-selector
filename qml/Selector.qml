@@ -91,6 +91,7 @@ Scope {
             property bool playlistShuffle: false
             property real playlistLastApplied: 0
             property var renamedTitles: ({})
+            property string pendingScrollPath: ""
 
             
             FileView {
@@ -211,6 +212,17 @@ Scope {
                     ScriptAction {
                         script: {
                             listView.interactive = true
+                            if (window.pendingScrollPath !== "") {
+                                let target = window.pendingScrollPath
+                                window.pendingScrollPath = ""
+                                for (let i = 0; i < filteredModel.count; i++) {
+                                    if (stripFileScheme(filteredModel.get(i).folder).replace(/\/$/, "") === target) {
+                                        listView.currentIndex = i
+                                        Qt.callLater(() => listView.positionViewAtIndex(i, ListView.Center))
+                                        break
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -531,6 +543,25 @@ Scope {
                 scanWallpapers()
             }
 
+            function getFilteredCandidates() {
+                let candidates = []
+                for (let i = 0; i < masterModel.count; i++) {
+                    let item = masterModel.get(i)
+                    let allowedContent = window.showMatureContent || 
+                        (item.contentrating !== "Mature" && item.contentrating !== "Questionable")
+                    let matchesFavorite = !window.showFavorite || item.isFavorite
+                    let matchesStatic = !window.showStatic || item.isStatic
+                    let matchesDynamic = !window.showDynamic || !item.isStatic
+                    let itemTags = []
+                    try { itemTags = JSON.parse(item.tags || "[]") } catch(e) {}
+                    let matchesTag = window.filterTag === "" || itemTags.some(t => t === window.filterTag.toLowerCase())
+                    let matchesPlaylist = !window.showPlaylist || window.playlist.indexOf(stripFileScheme(item.folder).replace(/\/$/, "")) !== -1
+                    if (allowedContent && matchesFavorite && matchesStatic && matchesDynamic && matchesTag && matchesPlaylist)
+                        candidates.push(item)
+                }
+                return candidates
+            }
+
             Shortcut {
                 sequences: ["Return", "Enter"]
                 onActivated: {
@@ -730,65 +761,56 @@ Scope {
                     }
 
                     if (cmd === ":random" || cmd === ":r") {
-                        let candidates = []
-
-                        for (let i = 0; i < masterModel.count; i++) {
-                            let item = masterModel.get(i)
-
-                            let allowedContent = window.showMatureContent ||
-                                (item.contentrating !== "Mature" && item.contentrating !== "Questionable")
-
-                            if (!item.isStatic && allowedContent) {
-                                candidates.push(item)
-                            }
-                        }
-
+                        let candidates = getFilteredCandidates().filter(item => !item.isStatic)
                         if (candidates.length > 0) {
                             let pick = candidates[Math.floor(Math.random() * candidates.length)]
                             applyWallpaper(pick)
+                            window.pendingScrollPath = stripFileScheme(pick.folder).replace(/\/$/, "")
+                            window.preCommandPath = window.pendingScrollPath
+                            window.wasInCommandMode = false
+                            window.suppressTextHandler = true
+                            searchInput.text = ""
+                            window.suppressTextHandler = false
+                            filterWallpapersAnimation()
+                            listView.forceActiveFocus()
+                            showStatus("Applied random wallpaper")
                         }
-
                         return
                     }
 
                     if (cmd === ":randomstatic" || cmd === ":rs") {
-                        let candidates = []
-
-                        for (let i = 0; i < masterModel.count; i++) {
-                            let item = masterModel.get(i)
-
-                            if (item.isStatic) {
-                                candidates.push(item)
-                            }
-                        }
-
+                        let candidates = getFilteredCandidates().filter(item => item.isStatic)
                         if (candidates.length > 0) {
                             let pick = candidates[Math.floor(Math.random() * candidates.length)]
                             applyWallpaper(pick)
+                            window.pendingScrollPath = stripFileScheme(pick.folder).replace(/\/$/, "")
+                            window.preCommandPath = window.pendingScrollPath
+                            window.wasInCommandMode = false
+                            window.suppressTextHandler = true
+                            searchInput.text = ""
+                            window.suppressTextHandler = false
+                            filterWallpapersAnimation()
+                            listView.forceActiveFocus()
+                            showStatus("Applied random static wallpaper")
                         }
-
                         return
                     }
 
                     if (cmd === ":randomfav" || cmd === ":rf") {
-                        let candidates = []
-                        for (let i = 0; i < masterModel.count; i++) {
-                            let item = masterModel.get(i)
-                            let allowedContent = window.showMatureContent ||
-                                (item.contentrating !== "Mature" && item.contentrating !== "Questionable")
-                            let matchesStatic = !window.showStatic || item.isStatic
-                            let matchesDynamic = !window.showDynamic || !item.isStatic
-                            if (item.isFavorite && allowedContent && matchesStatic && matchesDynamic)
-                                candidates.push(item)
-                        }
+                        let candidates = getFilteredCandidates().filter(item => item.isFavorite)
                         if (candidates.length > 0) {
                             let pick = candidates[Math.floor(Math.random() * candidates.length)]
                             applyWallpaper(pick)
+                            window.pendingScrollPath = stripFileScheme(pick.folder).replace(/\/$/, "")
+                            window.preCommandPath = window.pendingScrollPath
+                            window.wasInCommandMode = false
+                            window.suppressTextHandler = true
+                            searchInput.text = ""
+                            window.suppressTextHandler = false
+                            filterWallpapersAnimation()
+                            listView.forceActiveFocus()
+                            showStatus("Applied random favorite wallpaper")
                         }
-                        window.suppressTextHandler = true
-                        searchInput.text = ""
-                        window.suppressTextHandler = false
-                        listView.forceActiveFocus()
                         return
                     }
 
@@ -1218,6 +1240,17 @@ Scope {
                     for (let i = 0; i < filteredModel.count; i++) {
                         let modelPath = stripFileScheme(filteredModel.get(i).folder).replace(/\/$/, "")
 
+                        if (modelPath === target) {
+                            newIndex = i
+                            break
+                        }
+                    }
+                }
+
+                if (window.pendingScrollPath !== "") {
+                    let target = window.pendingScrollPath
+                    for (let i = 0; i < filteredModel.count; i++) {
+                        let modelPath = stripFileScheme(filteredModel.get(i).folder).replace(/\/$/, "")
                         if (modelPath === target) {
                             newIndex = i
                             break
@@ -1698,11 +1731,21 @@ Scope {
                                     Rectangle {
                                         anchors.fill: parent
                                         color: "transparent"
-                                        border.width: active ? 2 : 1
-                                        border.color: active ? Theme.border : Theme.background
-                                        Behavior on border.color { ColorAnimation { duration: 300 } }
+                                        border.width: 1
+                                        border.color: Theme.background
                                         radius: 15
                                         antialiasing: true
+                                    }
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        color: "transparent"
+                                        border.width: 2
+                                        border.color: Theme.border
+                                        radius: 15
+                                        antialiasing: true
+                                        opacity: active ? 1 : 0
+                                        Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
                                     }
                                 }
 
