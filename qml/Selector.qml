@@ -250,7 +250,7 @@ Scope {
                     let commands = [
                         ":static", ":dynamic", ":favorite", matureSuggestion, ":gif", ":rename",
                         ":playlist", ":playlistshuffle", ":playlist clear",
-                        ":random", ":randomstatic", ":randomfav",
+                        ":random", ":randomstatic", ":randomfav", ":export",
                         ":setfolder", ":setstatic", ":setthumb", ":setffmpeg",
                         ":clearcache", ":reload", ":tag", ":id", ":open",
                         ":sort default", ":sort name", ":sort recent", ":sort favorite", ":sort random",
@@ -811,6 +811,35 @@ Scope {
                             listView.forceActiveFocus()
                             showStatus("Applied random favorite wallpaper")
                         }
+                        return
+                    }
+
+                    if (cmd.startsWith(":export") || cmd.startsWith(":ex")) {
+                        let arg = rawCmd.replace(/^:(export|ex)\s*/i, "").trim().toLowerCase()
+                        
+                        let exportItems = getFilteredCandidates().filter(item => {
+                            if (item.isStatic) return false
+                            if (arg === "") return true
+                            let title = (item.title || "").toLowerCase()
+                            let folderName = item.folder.split("/").pop().toLowerCase()
+                            return title.indexOf(arg) !== -1 || folderName.indexOf(arg) !== -1
+                        })
+
+                        let lines = exportItems.map(item => {
+                            let id = stripFileScheme(item.folder).replace(/\/$/, "").split("/").pop().replace(/-1$/, "")
+                            return "https://steamcommunity.com/sharedfiles/filedetails/?id=" + id
+                        }).join("\n")
+
+                        let exportPath = stripFileScheme(Qt.resolvedUrl("exported-wallpapers.txt"))
+                        let escaped = lines.replace(/'/g, "'\\''")
+                        writeProcess.command = ["/bin/bash", "-c", `echo '${escaped}' > "${exportPath}"`]
+                        writeProcess.startDetached()
+                        showStatus("Exported " + exportItems.length + " wallpapers to export.txt")
+                        window.suppressTextHandler = true
+                        searchInput.text = ""
+                        window.suppressTextHandler = false
+                        filterWallpapersAnimation()
+                        listView.forceActiveFocus()
                         return
                     }
 
@@ -2018,6 +2047,7 @@ Scope {
                                     { cmd: ":random          |  :r",   desc: "Apply a random dynamic wallpaper" },
                                     { cmd: ":randomstatic    |  :rs",  desc: "Apply a random static wallpaper" },
                                     { cmd: ":randomfav       |  :rf",  desc: "Apply a random favorited wallpaper" },
+                                    { cmd: ":export <filter> |  :ex", desc: "Export filtered wallpaper URLs to export.txt" },
                                     { cmd: ":setfolder       |  :sf",  desc: "Set dynamic wallpapers folder" },
                                     { cmd: ":setstatic       |  :ss",  desc: "Set static wallpapers folder" },
                                     { cmd: ":setthumb        |  :st",  desc: "Set thumbnail cache folder" },
