@@ -32,6 +32,7 @@ For Nix users, prefer packaging/activation from your flake and run via your wrap
 - `/` enters search mode (slash-first search).
 - `:` enters command mode.
 - `h` / `l`: move selection left / right when search is not focused.
+- `f` (or `Ctrl+F`): toggle selected wallpaper as favorite.
 - `m`: toggle selected wallpaper in playlist queue.
 - `p`: start/stop playlist playback.
 - `J` / `K`: move selected queued item down / up.

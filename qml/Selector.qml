@@ -1393,6 +1393,7 @@ Scope {
                             }
 
                             item.isFavorite = !item.isFavorite;
+                            showStatus(item.isFavorite ? "Added to favorites" : "Removed from favorites");
                             event.accepted = true;
                             return;
                         }
@@ -2210,6 +2211,37 @@ Scope {
                                     return;
                                 }
 
+                                if (event.key === Qt.Key_F) {
+                                    let item = getCurrentFilteredItem();
+                                    if (item) {
+                                        let path = stripFileScheme(item.folder);
+
+                                        for (let i = 0; i < masterModel.count; i++) {
+                                            let mItem = masterModel.get(i);
+                                            if (stripFileScheme(mItem.folder) === path) {
+                                                mItem.isFavorite = !mItem.isFavorite;
+
+                                                if (mItem.isFavorite) {
+                                                    if (!window.favorites.includes(path))
+                                                        window.favorites.push(path);
+                                                } else {
+                                                    let idx = window.favorites.indexOf(path);
+                                                    if (idx !== -1)
+                                                        window.favorites.splice(idx, 1);
+                                                }
+
+                                                saveSettings();
+                                                showStatus(mItem.isFavorite ? "Added to favorites" : "Removed from favorites");
+                                                break;
+                                            }
+                                        }
+
+                                        item.isFavorite = !item.isFavorite;
+                                        event.accepted = true;
+                                    }
+                                    return;
+                                }
+
                                 if (event.key === Qt.Key_M) {
                                     toggleCurrentInPlaylist();
                                     event.accepted = true;
@@ -2374,6 +2406,10 @@ Scope {
                             {
                                 cmd: "h / l           |    ",
                                 desc: "Move selection left/right"
+                            },
+                            {
+                                cmd: "f / Ctrl+F      |    ",
+                                desc: "Toggle favorite for selected wallpaper"
                             },
                             {
                                 cmd: "J / K           |    ",
