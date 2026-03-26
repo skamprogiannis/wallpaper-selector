@@ -11,10 +11,13 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Wayland
+import Quickshell.Hyprland
 
 Scope {
+    readonly property string focusedMonitorName: Hyprland.focusedWorkspace?.monitor?.name || ""
+
     Variants {
-        model: Quickshell.screens
+        model: Quickshell.screens.filter(screen => focusedMonitorName === "" || screen.name === focusedMonitorName)
 
         PanelWindow {
             id: window
