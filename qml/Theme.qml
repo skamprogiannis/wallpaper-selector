@@ -13,6 +13,29 @@ QtObject {
     property color accent: "#B27A8364"
     property color text: "#edd1bf"
 
+    function parseColorVar(name, fallback) {
+        let data = String(colorFile.text());
+        let regex = new RegExp("\\\\$" + name + "\\\\s*=\\\\s*rgb\\\\(([0-9a-fA-F]{6,8})\\\\)");
+        let match = data.match(regex);
+        if (!match || match.length < 2)
+            return fallback;
+        return "#" + match[1].slice(0, 6);
+    }
+
+    function updateFromDmsColors() {
+        let surface = parseColorVar("surface", background);
+        let onSurface = parseColorVar("onSurface", text);
+        let primary = parseColorVar("primary", border);
+        let outline = parseColorVar("outline", primary);
+
+        root.background = "#B2" + surface.replace("#", "");
+        root.background90 = "#E6" + surface.replace("#", "");
+        root.border = primary;
+        root.accent = "#B2" + outline.replace("#", "");
+        root.text = onSurface;
+        root.loaded = true;
+    }
+
     Behavior on background {
         ColorAnimation {
             duration: root.loaded ? 800 : 0
@@ -49,21 +72,15 @@ QtObject {
         }
     }
 
-    property string walColorsPath: String(StandardPaths.writableLocation(StandardPaths.HomeLocation)).replace(/^file:\/\//, "") + "/.cache/wal/colors.json"
+    property string dmsColorsPath: String(StandardPaths.writableLocation(StandardPaths.HomeLocation)).replace(/^file:\/\//, "") + "/.config/hypr/dms/colors.conf"
 
     property var _watcher: FileView {
-        id: walFile
-        path: root.walColorsPath
+        id: colorFile
+        path: root.dmsColorsPath
         blockLoading: true
         onLoaded: {
             try {
-                let json = JSON.parse(text().trim());
-                root.background = "#B2" + json.colors.color0.replace("#", "");
-                root.background90 = "#E6" + json.colors.color0.replace("#", "");
-                root.border = json.colors.color12;
-                root.accent = "#B2" + json.colors.color1.replace("#", "");
-                root.text = json.special.foreground;
-                root.loaded = true;
+                root.updateFromDmsColors();
             } catch (e) {}
         }
     }
@@ -72,7 +89,7 @@ QtObject {
         interval: 2000
         repeat: true
         running: true
-        onTriggered: walFile.reload()
-        Component.onCompleted: walFile.reload()
+        onTriggered: colorFile.reload()
+        Component.onCompleted: colorFile.reload()
     }
 }

@@ -11,7 +11,6 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Wayland
-import QtMultimedia
 
 Scope {
     Variants {
@@ -38,16 +37,16 @@ Scope {
                 }
             }
 
-            property string defaultBaseFolder: StandardPaths.writableLocation(StandardPaths.HomeLocation) + "/.local/share/Steam/steamapps/workshop/content/431960/"
+            property string defaultBaseFolder: StandardPaths.writableLocation(StandardPaths.HomeLocation) + "/games/SteamLibrary/steamapps/workshop/content/431960/"
 
-            property string defaultStaticWallpaperFolder: StandardPaths.writableLocation(StandardPaths.PicturesLocation)
+            property string defaultStaticWallpaperFolder: StandardPaths.writableLocation(StandardPaths.HomeLocation) + "/wallpapers"
 
             property string defaultThumbFolder: String(StandardPaths.writableLocation(StandardPaths.HomeLocation)).replace(/^file:\/\//, "") + "/.cache/quickshell-wallpaper-thumbs"
 
             property string baseFolder: defaultBaseFolder
             property string staticWallpaperFolder: defaultStaticWallpaperFolder
             property string thumbFolder: defaultThumbFolder
-            property string ffmpegPath: "/usr/bin/ffmpeg"
+            property string ffmpegPath: "ffmpeg"
 
             property bool anyHovered: false
             property bool keyboardNavigation: true
@@ -142,7 +141,7 @@ Scope {
                 id: playlistDaemon
                 Component.onCompleted: {
                     let home = stripFileScheme(StandardPaths.writableLocation(StandardPaths.HomeLocation));
-                    command = ["/bin/bash", "-c", `pgrep -fx 'bash.*wallpaper-playlist.sh' > /dev/null || { nohup ${home}/.local/bin/wallpaper-playlist.sh > /dev/null 2>&1 & disown; }`];
+                    command = ["bash", "-c", `pgrep -fx 'bash.*wallpaper-playlist.sh' > /dev/null || { nohup ${home}/.local/bin/wallpaper-playlist.sh > /dev/null 2>&1 & disown; }`];
                     startDetached();
                 }
             }
@@ -240,8 +239,7 @@ Scope {
                 }
 
                 if (raw.startsWith(":") && !raw.includes(" ")) {
-                    let matureSuggestion = ":" + toggleMatureContentKey;
-                    let commands = [":static", ":dynamic", ":favorite", matureSuggestion, ":gif", ":rename", ":playlist", ":playlistshuffle", ":playlist clear", ":random", ":randomstatic", ":randomfav", ":export", ":setfolder", ":setstatic", ":setthumb", ":setffmpeg", ":clearcache", ":reload", ":tag", ":id", ":open", ":sort default", ":sort name", ":sort recent", ":sort favorite", ":sort random", ":help"];
+                    let commands = [":static", ":dynamic", ":favorite", ":gif", ":rename", ":playlist", ":playlistshuffle", ":playlist clear", ":random", ":randomstatic", ":randomfav", ":export", ":setfolder", ":setstatic", ":setthumb", ":setffmpeg", ":clearcache", ":reload", ":tag", ":id", ":open", ":sort default", ":sort name", ":sort recent", ":sort favorite", ":sort random", ":help"];
                     suggestions = commands.filter(c => c.startsWith(lower) && c !== lower);
                     suggestionIndex = suggestions.length > 0 ? 0 : -1;
                     return;
@@ -265,7 +263,7 @@ Scope {
                             let escapedBase = base.replace(/'/g, "'\\''");
                             cmd = `find '${escapedDir}' -maxdepth 1 -mindepth 1 -type d -iname '*${escapedBase}*' 2>/dev/null | sed 's|$|/|' | head -20 > /tmp/qs-path-complete.txt`;
                         }
-                        pathCompleteProcess.command = ["/bin/bash", "-c", cmd];
+                        pathCompleteProcess.command = ["bash", "-c", cmd];
                         pathCompleteProcess.startDetached();
                         pathCompleteTimer.restart();
                     } else {
@@ -365,7 +363,7 @@ Scope {
 
                 console.log("Applying wallpaper:", folder);
 
-                let args = ["/bin/bash", scriptPath,];
+                let args = ["bash", scriptPath,];
 
                 if (!item.isStatic) {
                     let cleanFolder = stripFileScheme(item.folder).replace(/\/$/, "");
@@ -418,7 +416,7 @@ Scope {
             function drainThumbQueue() {
                 if (thumbQueue.length === 0 || thumbProcess.running)
                     return;
-                thumbProcess.command = ["/bin/bash", "-c", thumbQueue.shift()];
+                thumbProcess.command = ["bash", "-c", thumbQueue.shift()];
                 thumbProcess.startDetached();
             }
 
@@ -467,7 +465,7 @@ Scope {
                         window.baseFolder = json.baseFolder || window.defaultBaseFolder;
                         window.staticWallpaperFolder = json.staticWallpaperFolder || window.defaultStaticWallpaperFolder;
                         window.thumbFolder = json.thumbFolder || window.defaultThumbFolder;
-                        window.ffmpegPath = json.ffmpegPath || "/usr/bin/ffmpeg";
+                        window.ffmpegPath = (json.ffmpegPath && json.ffmpegPath !== "/usr/bin/ffmpeg") ? json.ffmpegPath : "ffmpeg";
                         window.filterTag = json.filterTag || "";
                         window.renamedTitles = json.renamedTitles || {};
                         window.favorites = json.favorites || [];
@@ -492,7 +490,7 @@ Scope {
                         window.baseFolder = window.defaultBaseFolder;
                         window.staticWallpaperFolder = window.defaultStaticWallpaperFolder;
                         window.thumbFolder = window.defaultThumbFolder;
-                        window.ffmpegPath = "/usr/bin/ffmpeg";
+                        window.ffmpegPath = "ffmpeg";
                     }
                     if (callback)
                         callback();
@@ -531,7 +529,7 @@ Scope {
                 });
 
                 let escaped = jsonStr.replace(/'/g, "'\\''");
-                writeProcess.command = ["/bin/bash", "-c", `echo '${escaped}' > "${settingsPath}"`];
+                writeProcess.command = ["bash", "-c", `echo '${escaped}' > "${settingsPath}"`];
                 writeProcess.startDetached();
             }
 
@@ -547,7 +545,7 @@ Scope {
                 let candidates = [];
                 for (let i = 0; i < masterModel.count; i++) {
                     let item = masterModel.get(i);
-                    let allowedContent = window.showMatureContent || (item.contentrating !== "Mature" && item.contentrating !== "Questionable");
+                    let allowedContent = item.contentrating !== "Mature" && item.contentrating !== "Questionable";
                     let matchesFavorite = !window.showFavorite || item.isFavorite;
                     let matchesStatic = !window.showStatic || item.isStatic;
                     let matchesDynamic = !window.showDynamic || !item.isStatic;
@@ -575,7 +573,6 @@ Scope {
                     let rawCmd = searchInput.text.trim();
                     let cmd = rawCmd.toLowerCase();
                     let expectedPrefix = ":";
-                    let matureCmd = expectedPrefix + window.toggleMatureContentKey.toLowerCase();
 
                     if (cmd === ":help" || cmd === ":h") {
                         window.showHelp = true;
@@ -681,19 +678,6 @@ Scope {
                         window.suppressTextHandler = true;
                         searchInput.text = "";
                         window.suppressTextHandler = false;
-                        listView.forceActiveFocus();
-                        return;
-                    }
-
-                    if (cmd === matureCmd) {
-                        window.isMatureContentTriggered = true;
-                        window.showMatureContent = !window.showMatureContent;
-                        saveSettings();
-                        filterWallpapersAnimation();
-                        window.suppressTextHandler = true;
-                        searchInput.text = "";
-                        window.suppressTextHandler = false;
-                        searchDebounceTimer.stop();
                         listView.forceActiveFocus();
                         return;
                     }
@@ -834,7 +818,7 @@ Scope {
 
                         let exportPath = stripFileScheme(Qt.resolvedUrl("exported-wallpapers.txt"));
                         let escaped = lines.replace(/'/g, "'\\''");
-                        writeProcess.command = ["/bin/bash", "-c", `echo '${escaped}' > "${exportPath}"`];
+                        writeProcess.command = ["bash", "-c", `echo '${escaped}' > "${exportPath}"`];
                         writeProcess.startDetached();
                         showStatus("Exported " + exportItems.length + " wallpapers to export.txt");
                         window.suppressTextHandler = true;
@@ -931,7 +915,7 @@ Scope {
                         let path = window.preCommandPath !== "" ? window.preCommandPath.replace(/\/$/, "").split("/").pop() : window.lastWallpaperPath.replace(/\/$/, "").split("/").pop();
                         let id = path.replace(/\/$/, "").split("/").pop().replace(/-1$/, "");
                         if (id && /^\d+$/.test(id)) {
-                            workshopidProcess.command = ["/bin/bash", "-c", `xdg-open "steam://url/CommunityFilePage/${id}"`];
+                            workshopidProcess.command = ["bash", "-c", `xdg-open "steam://url/CommunityFilePage/${id}"`];
                             workshopidProcess.startDetached();
                         }
                         filterWallpapersAnimation();
@@ -946,7 +930,7 @@ Scope {
                         let path = window.preCommandPath !== "" ? window.preCommandPath : window.lastWallpaperPath;
                         if (path !== "") {
                             let id = path.replace(/\/$/, "").split("/").pop();
-                            workshopidProcess.command = ["/bin/bash", "-c", `printf '%s' "${id}" | wl-copy`];
+                            workshopidProcess.command = ["bash", "-c", `printf '%s' "${id}" | wl-copy`];
                             workshopidProcess.startDetached();
                         }
                         filterWallpapersAnimation();
@@ -999,7 +983,7 @@ Scope {
             function deleteFolder(path) {
                 if (!path || path === "")
                     return;
-                deleteFolderProcess.command = ["/bin/bash", "-c", `rm -rf "${path}"`];
+                deleteFolderProcess.command = ["bash", "-c", `rm -rf "${path}"`];
                 deleteFolderProcess.startDetached();
             }
 
@@ -1053,7 +1037,7 @@ Scope {
                     staticFiles.folder = "file://" + staticWallpaperFolder;
                     staticFiles.showDirs = false;
                     staticFiles.showFiles = true;
-                    staticFiles.nameFilters = ["*.jpg", "*.png", "*.jpeg", "*.gif"];
+                    staticFiles.nameFilters = ["*.jpg", "*.png", "*.jpeg", "*.gif", "*.webp"];
 
                     staticFiles.onStatusChanged.connect(function () {
                         if (staticFiles.status !== FolderListModel.Ready)
@@ -1069,6 +1053,7 @@ Scope {
                                 originalTitle: filePath.split("/").pop(),
                                 isStatic: true,
                                 isFavorite: window.favorites.includes(filePath),
+                                contentrating: "Everyone",
                                 tags: "[]"
                             });
                         }
@@ -1088,7 +1073,7 @@ Scope {
                 let path = Qt.resolvedUrl("settings.json").toString().replace(/^file:\/\//, "");
                 let dir = path.replace(/\/[^\/]*$/, "");
                 window.settingsPath = path;
-                initSettingsProcess.command = ["/bin/bash", "-c", `mkdir -p "${dir}" && [ -f "${path}" ] || echo '{}' > "${path}"`];
+                initSettingsProcess.command = ["bash", "-c", `mkdir -p "${dir}" && [ -f "${path}" ] || echo '{}' > "${path}"`];
                 initSettingsProcess.startDetached();
                 Qt.callLater(() => {
                     loadSettings(function () {
@@ -1148,7 +1133,7 @@ Scope {
 
                     var matchesText = filter === "" || title.indexOf(filter) !== -1 || folderName.indexOf(filter) !== -1;
 
-                    var allowedContent = window.showMatureContent || (item.contentrating !== "Mature" && item.contentrating !== "Questionable");
+                    var allowedContent = item.contentrating !== "Mature" && item.contentrating !== "Questionable";
                     var matchesFavorite = !window.showFavorite || item.isFavorite;
                     var matchesStatic = !window.showStatic || item.isStatic;
                     var matchesDynamic = !window.showDynamic || !item.isStatic;
@@ -1640,8 +1625,6 @@ Scope {
                                 parts.push(" Static");
                             if (window.showDynamic)
                                 parts.push(" Dynamic");
-                            if (window.showMatureContent && !showStatic)
-                                parts.push(" NSFW");
                             if (window.playlistActive) {
                                 parts.push("󰐑 Playlist " + (window.showPlaylist ? "only " : "") + window.playlist.length + (window.playlistShuffle ? " " : ""));
                             } else if (window.playlist.length > 0) {
@@ -1788,6 +1771,8 @@ Scope {
                                                                 fullPath = previewLoader.normalizedPath;
                                                             else
                                                                 return "";
+                                                            if (isStatic)
+                                                                return "file://" + fullPath;
                                                             let hash = Qt.md5(fullPath);
                                                             return "file://" + window.thumbFolder + "/" + hash + ".jpg";
                                                         }
@@ -2241,10 +2226,6 @@ Scope {
                             {
                                 cmd: ":favorite        |  :f",
                                 desc: "Toggle favorites filter"
-                            },
-                            {
-                                cmd: "Customizeable    |  :sus",
-                                desc: "Toggle Mature content filter"
                             },
                             {
                                 cmd: ":rename <name>   |  :rn ",
