@@ -239,7 +239,7 @@ Scope {
                 }
 
                 if (raw.startsWith(":") && !raw.includes(" ")) {
-                    let commands = [":static", ":dynamic", ":favorite", ":gif", ":rename", ":playlist", ":playlistshuffle", ":playlist clear", ":random", ":randomstatic", ":randomfav", ":export", ":setfolder", ":setstatic", ":setthumb", ":setffmpeg", ":clearcache", ":reload", ":tag", ":id", ":open", ":sort default", ":sort name", ":sort recent", ":sort favorite", ":sort random", ":help"];
+                    let commands = [":static", ":dynamic", ":favorite", ":gif", ":rename", ":playlist", ":playlistshuffle", ":playlist clear", ":playlist up", ":playlist down", ":random", ":randomstatic", ":randomfav", ":export", ":setfolder", ":setstatic", ":setthumb", ":setffmpeg", ":clearcache", ":reload", ":tag", ":id", ":open", ":sort default", ":sort name", ":sort recent", ":sort favorite", ":sort random", ":help"];
                     suggestions = commands.filter(c => c.startsWith(lower) && c !== lower);
                     suggestionIndex = suggestions.length > 0 ? 0 : -1;
                     return;
@@ -1099,6 +1099,7 @@ Scope {
                 var rawFilter = searchInput.text.trim();
                 let wasInCommandMode = window.wasInCommandMode;
                 let enteringCommand = rawFilter.startsWith(":");
+                let enteringSearch = rawFilter.startsWith("/");
                 let leavingCommand = !enteringCommand && wasInCommandMode;
 
                 if (enteringCommand && !window.wasInCommandMode) {
@@ -1119,6 +1120,11 @@ Scope {
                     window.wasInCommandMode = true;
                     return;
                 }
+
+                if (enteringSearch) {
+                    rawFilter = rawFilter.slice(1);
+                }
+
                 var filter = rawFilter.toLowerCase();
                 var previousItem = getCurrentFilteredItem();
                 var previousFolder = previousItem ? stripFileScheme(previousItem.folder).replace(/\/$/, "") : "";
@@ -1393,12 +1399,28 @@ Scope {
                                 return;
                             }
                         }
-                        if (!searchInput.activeFocus && !window.showHelp && event.key !== Qt.Key_Backspace && event.key !== Qt.Key_Escape && event.key !== Qt.Key_Tab && event.text.length > 0) {
-                            searchInput.visible = true;
-                            searchInput.forceActiveFocus();
-                            searchInput.text = event.text;
-                            searchInput.cursorPosition = 1;
-                            event.accepted = true;
+                        if (!searchInput.activeFocus && !window.showHelp) {
+                            if (event.key === Qt.Key_Slash) {
+                                searchInput.visible = true;
+                                searchInput.forceActiveFocus();
+                                searchInput.text = "/";
+                                searchInput.cursorPosition = 1;
+                                event.accepted = true;
+                                return;
+                            }
+
+                            if (event.key === Qt.Key_Colon) {
+                                searchInput.visible = true;
+                                searchInput.forceActiveFocus();
+                                searchInput.text = ":";
+                                searchInput.cursorPosition = 1;
+                                event.accepted = true;
+                                return;
+                            }
+
+                            if (event.text.length > 0) {
+                                return;
+                            }
                         }
                     }
 
@@ -2112,6 +2134,51 @@ Scope {
                                 }
                             }
 
+                            function movePlaylistSelection(offset) {
+                                let item = getCurrentFilteredItem();
+                                if (!item)
+                                    return false;
+                                let path = stripFileScheme(item.folder).replace(/\/$/, "");
+                                let idx = window.playlist.indexOf(path);
+                                if (idx === -1)
+                                    return false;
+                                let next = idx + offset;
+                                if (next < 0 || next >= window.playlist.length)
+                                    return false;
+
+                                let arr = [...window.playlist];
+                                let tmp = arr[idx];
+                                arr[idx] = arr[next];
+                                arr[next] = tmp;
+                                window.playlist = arr;
+                                saveSettings();
+                                if (window.showPlaylist)
+                                    filterWallpapersAnimation();
+                                showStatus("Playlist order updated");
+                                return true;
+                            }
+
+                            function toggleCurrentInPlaylist() {
+                                let item = getCurrentFilteredItem();
+                                if (!item)
+                                    return false;
+                                let path = stripFileScheme(item.folder).replace(/\/$/, "");
+                                let idx = window.playlist.indexOf(path);
+                                if (idx === -1) {
+                                    window.playlist = [...window.playlist, path];
+                                    showStatus("Added to playlist");
+                                } else {
+                                    window.playlist = window.playlist.filter((_, i) => i !== idx);
+                                    showStatus("Removed from playlist");
+                                }
+                                if (window.playlist.length === 0)
+                                    window.playlistActive = false;
+                                saveSettings();
+                                if (window.showPlaylist)
+                                    filterWallpapersAnimation();
+                                return true;
+                            }
+
                             Keys.onLeftPressed: event => {
                                 window.keyboardNavigation = true;
                                 listView.currentIndex = Math.max(0, listView.currentIndex - 1);
@@ -2122,18 +2189,60 @@ Scope {
                                 listView.currentIndex = Math.min(listView.count - 1, listView.currentIndex + 1);
                             }
 
+                            Keys.onPressed: event => {
+                                if (searchInput.activeFocus || window.showHelp || event.modifiers !== Qt.NoModifier)
+                                    return;
+
+                                if (event.key === Qt.Key_H) {
+                                    window.keyboardNavigation = true;
+                                    listView.currentIndex = Math.max(0, listView.currentIndex - 1);
+                                    event.accepted = true;
+                                    return;
+                                }
+
+                                if (event.key === Qt.Key_L) {
+                                    window.keyboardNavigation = true;
+                                    listView.currentIndex = Math.min(listView.count - 1, listView.currentIndex + 1);
+                                    event.accepted = true;
+                                    return;
+                                }
+
+                                if (event.key === Qt.Key_M) {
+                                    toggleCurrentInPlaylist();
+                                    event.accepted = true;
+                                    return;
+                                }
+
+                                if (event.key === Qt.Key_P) {
+                                    if (window.playlist.length > 0) {
+                                        window.playlistActive = !window.playlistActive;
+                                        if (window.playlistActive)
+                                            window.playlistLastApplied = 0;
+                                        saveSettings();
+                                        showStatus(window.playlistActive ? "Playlist started · " + window.playlist.length + " wallpapers · every " + window.playlistInterval + "m" : "Playlist stopped");
+                                        event.accepted = true;
+                                    }
+                                    return;
+                                }
+
+                                if (event.key === Qt.Key_J) {
+                                    if (movePlaylistSelection(1)) {
+                                        event.accepted = true;
+                                    }
+                                    return;
+                                }
+
+                                if (event.key === Qt.Key_K) {
+                                    if (movePlaylistSelection(-1)) {
+                                        event.accepted = true;
+                                    }
+                                    return;
+                                }
+                            }
+
                             Keys.onReturnPressed: event => {
                                 if (window.showHelp) {
                                     window.showHelp = false;
-                                    return;
-                                }
-                                if (window.playlist.length > 0) {
-                                    window.playlistActive = !window.playlistActive;
-                                    if (window.playlistActive) {
-                                        window.playlistLastApplied = 0;
-                                    }
-                                    saveSettings();
-                                    showStatus(window.playlistActive ? "Playlist started · " + window.playlist.length + " wallpapers · every " + window.playlistInterval + "m" : "Playlist stopped");
                                     return;
                                 }
                                 applyWallpaper(getCurrentFilteredItem());
@@ -2252,12 +2361,20 @@ Scope {
                                 desc: "Makes playlist random"
                             },
                             {
-                                cmd: "Shift+Click      |    ",
+                                cmd: "Shift+Click / m  |    ",
                                 desc: "Add/remove wallpaper from playlist"
                             },
                             {
-                                cmd: "Shift+Enter      |    ",
-                                desc: "Start/stop playlist when items added"
+                                cmd: "p               |    ",
+                                desc: "Start/stop playlist"
+                            },
+                            {
+                                cmd: "h / l           |    ",
+                                desc: "Move selection left/right"
+                            },
+                            {
+                                cmd: "J / K           |    ",
+                                desc: "Move selected playlist item down/up"
                             },
                             {
                                 cmd: ":random          |  :r",
@@ -2325,7 +2442,7 @@ Scope {
                             },
                             {
                                 cmd: "Sort Shortcuts   |",
-                                desc: "d,       n,    r,      f,"
+                                desc: "d, n, r, f"
                             },
                             {
                                 cmd: ":help            |   :h",

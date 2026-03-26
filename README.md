@@ -29,11 +29,22 @@ For Nix users, prefer packaging/activation from your flake and run via your wrap
 ## General controls
 
 - Arrow keys, mouse drag, and wheel: navigate the grid.
+- Slash-first search: type `/` first, then your search text.
 - `Shift` + click: add/remove hovered wallpaper from playlist.
 - `Shift` + `Enter`: start/stop playlist when items exist.
+- `m` / `p` / `J` / `K`: keyboard playlist queue/play/order controls.
 - `Enter` or double click: apply selected wallpaper.
 - `Esc` or clicking outside: close help/suggestions/window.
 - Type `:` to enter command mode.
+
+## Vim-like keyboard workflow
+
+- `/` enters search mode. Type your query after the slash.
+- `:` enters command mode.
+- `h` / `l` moves selection left / right when search is not focused.
+- `m` toggles the selected wallpaper in the playlist queue.
+- `p` starts/stops playlist playback.
+- `J` / `K` reorders the selected queued item down / up.
 
 ## Commands
 
