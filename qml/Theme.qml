@@ -14,8 +14,8 @@ QtObject {
     property color text: "#edd1bf"
 
     function parseColorVar(name, fallback) {
-        let data = String(colorFile.text());
-        let regex = new RegExp("\\\\$" + name + "\\\\s*=\\\\s*rgb\\\\(([0-9a-fA-F]{6,8})\\\\)");
+        let data = String(colorFile.text() || "");
+        let regex = new RegExp("^\\s*\\$" + name + "\\s*=\\s*rgb\\(([0-9a-fA-F]{6,8})\\)\\s*$", "m");
         let match = data.match(regex);
         if (!match || match.length < 2)
             return fallback;
@@ -73,10 +73,11 @@ QtObject {
     }
 
     property string dmsColorsPath: String(StandardPaths.writableLocation(StandardPaths.HomeLocation)).replace(/^file:\/\//, "") + "/.config/hypr/dms/colors.conf"
+    property string dmsColorsUrl: dmsColorsPath.startsWith("file://") ? dmsColorsPath : "file://" + dmsColorsPath
 
     property var _watcher: FileView {
         id: colorFile
-        path: root.dmsColorsPath
+        path: root.dmsColorsUrl
         blockLoading: true
         onLoaded: {
             try {
