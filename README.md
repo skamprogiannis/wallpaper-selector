@@ -1,53 +1,117 @@
-Yet another wallpaper selector made with quickshell.
-Inspired by these 
+# wallpaper-selector
 
-https://github.com/ilyamiro/nixos-configuration
-https://github.com/liixini/skwd
+Quickshell-based wallpaper selector UI for dynamic (Wallpaper Engine) and static wallpapers.
 
-Pretty beta at the moment expect bugs...
+This fork is tuned to work cleanly with a Nix/Home Manager setup where the QML app is packaged declaratively and scripts are wrapped by the host system.
 
-Demo in  reddit:
-https://www.reddit.com/r/unixporn/comments/1rz6nil/oc_made_a_command_based_quickshell_wallpaper/
+## Nix-oriented setup notes
 
-Dependencies:
-ffmpeg, linux-wallpaper-engine, quickshell, pywal, swww 
-and dependencies of everything listed here as expected
+- The app is designed to run from `~/.config/quickshell/wallpaper` (copied there by Home Manager activation).
+- `ffmpegPath` defaults to `ffmpeg` (PATH lookup), which matches Nix-wrapped runtime launchers.
+- Script calls use `bash` from PATH instead of hardcoded `/bin/bash`.
+- Theme colors are read from DMS output at `~/.config/hypr/dms/colors.conf`.
+- Static wallpaper default folder is `~/wallpapers`.
+- Dynamic workshop folder default is `~/games/SteamLibrary/steamapps/workshop/content/431960/`.
+- Mature/Questionable content is filtered out and the `:sus` toggle is removed in this fork.
 
-Above dependecies are for plug and play behavior you can substitute pywal and sww dependecies
-easily by changing wallpaper-apply.sh and wallpaper-apply-static.sh and changing the color read location of Theme.qml and using other tools
-I cant add check for every tool and their locations if someone else does it they are welcome.
+## Running manually
 
-Installation:
+If you are not using Nix packaging, you can still use the upstream-style setup:
 
-Clone this repository and run setup.sh and follow along.
-
-```
-git clone https://github.com/Aino-Chan/wallpaper-selector.git
+```bash
+git clone https://github.com/skamprogiannis/wallpaper-selector.git
 cd wallpaper-selector
 ./setup.sh
 ```
-If you dont want to use the setup script you can git clone and edit scripts on scripts folder and copy them to ~/.local/bin and quickshell files to ~/.config/quickshell/ and edit freely if you lack dependencies that wont work so install script is recommended.
 
-Scripts on scripts folder is as is copied pasted from what I use except 2 lines that hook up css generating scripts of mine dont expect for them to work out of box they are there for ease of copying and editing incase install script fails.
+For Nix users, prefer packaging/activation from your flake and run via your wrapper command.
 
-Compositor compatibility:
-Works in hyprland didnt test other compositors but it should work as long as it can detect your monitor and is wayland (I dont have intentions to add x11 support unless too many request the support shouldnt be too hard but I dont use x11 if someone adds a patch I will merge).
+## General controls
 
+- Arrow keys, mouse drag, and wheel: navigate the grid.
+- `Shift` + click: add/remove hovered wallpaper from playlist.
+- `Shift` + `Enter`: start/stop playlist when items exist.
+- `Enter` or double click: apply selected wallpaper.
+- `Esc` or clicking outside: close help/suggestions/window.
+- Type `:` to enter command mode.
 
-Disclaimer:
-AI tools were used when making this fun project I am not hiding anything if you encounter serious bugs please inform me. ("Terrible" ui decisions were not effected by AI and readme was not written by AI as you can guess already [I hope])
+## Commands
 
-for your color/css generating scripts if you dont directly create shemes with pywal I would suggest
-hooking them on wallpaper-apply.sh and wallpaper-apply-static.sh and remove wal with the color generating tools you use
+- `:help` / `:h`
+  - Open command help overlay.
 
-Usage:
+- `:static` / `:s`
+  - Toggle static-only filter.
 
-Navigate using arrow keys mouse dragging or scroll wheel
-Shift and clicking adds the hovered item to playlist and shift enter starts the playlist
-Escape or clicking outside the application closes it (same goes for help pop up and suggestions dropdown menu)
-Enter or double click applies the current selected wallpaper (double click works on everywhere)
-Typing in ":" makes you enter command mode and you can type commands for functionality
-You can edit the shell and add your own commands (altough it is quite messy atm)
+- `:dynamic` / `:d`
+  - Toggle dynamic-only filter.
 
-Commands:
-Please type :help for full command list and descriptions in text field.
+- `:favorite` / `:f`
+  - Toggle favorites-only filter.
+
+- `:rename <name>` / `:rn <name>`
+  - Rename highlighted wallpaper label.
+
+- `:rename` / `:rn`
+  - Clear custom renamed label for highlighted wallpaper.
+
+- `:gif`
+  - Toggle animated GIF preview playback.
+
+- `:playlist <minutes>` / `:pl <minutes>`
+  - Set playlist interval in minutes.
+
+- `:playlist` / `:pl`
+  - Toggle playlist filter (show playlist items only).
+
+- `:playlistshuffle` / `:pls`
+  - Toggle playlist shuffle mode.
+
+- `:playlist clear` / `:playlist c` / `:pl clear` / `:pl c`
+  - Clear playlist and stop active playlist mode.
+
+- `:random` / `:r`
+  - Apply a random dynamic wallpaper.
+
+- `:randomstatic` / `:rs`
+  - Apply a random static wallpaper.
+
+- `:randomfav` / `:rf`
+  - Apply a random favorited wallpaper.
+
+- `:export <filter>` / `:ex <filter>`
+  - Export matching dynamic wallpapers as Steam Workshop URLs to `exported-wallpapers.txt`.
+
+- `:setfolder <path>` / `:sf <path>`
+  - Set dynamic wallpaper base folder.
+
+- `:setstatic <path>` / `:ss <path>`
+  - Set static wallpaper folder.
+
+- `:setthumb <path>` / `:st <path>`
+  - Set thumbnail cache folder and rebuild cache pathing.
+
+- `:setffmpeg <path>`
+  - Set ffmpeg binary path used for thumbnail extraction.
+
+- `:clearcache` / `:cc`
+  - Remove thumbnail cache and regenerate.
+
+- `:reload` / `:rl`
+  - Reload wallpaper folders and metadata.
+
+- `:sort <mode>`
+  - Sort results by one of: `default`, `name`, `recent`, `favorite`, `random`.
+  - Short aliases: `d`, `n`, `r`, `f`.
+
+- `:open` / `:o`
+  - Open highlighted wallpaper's Steam Workshop page.
+
+- `:id`
+  - Copy highlighted wallpaper ID/folder tail to clipboard.
+
+- `:tag <name>`
+  - Toggle filter by tag name.
+
+- `:tag`
+  - Clear current tag filter.
