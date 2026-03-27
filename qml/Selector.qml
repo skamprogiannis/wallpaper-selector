@@ -1152,14 +1152,69 @@ Scope {
                                 tags: "[]"
                             });
                         }
-                        Qt.callLater(() => {
-                            cleanupThumbnails(window.validThumbs);
-                        });
-                        filterWallpapers();
 
-                        Qt.callLater(() => {
-                            initialFadeIn.start();
-                            window.isInitialLoad = false;
+                        // Finalize after all subdir scans complete (or immediately if none)
+                        function finalizeStaticScan() {
+                            Qt.callLater(() => { cleanupThumbnails(window.validThumbs); });
+                            filterWallpapers();
+                            Qt.callLater(() => { initialFadeIn.start(); window.isInitialLoad = false; });
+                        }
+
+                        // Scan one level of subdirectories for additional static wallpapers
+                        var subDirs = Qt.createQmlObject('import Qt.labs.folderlistmodel 1.0; FolderListModel {}', window);
+                        subDirs.folder = "file://" + staticWallpaperFolder;
+                        subDirs.showDirs = true;
+                        subDirs.showFiles = false;
+                        subDirs.showHidden = false;
+
+                        subDirs.onStatusChanged.connect(function () {
+                            if (subDirs.status !== FolderListModel.Ready)
+                                return;
+
+                            let dirsToScan = [];
+                            for (let j = 0; j < subDirs.count; j++) {
+                                let dirPath = stripFileScheme(subDirs.get(j, "filePath")).replace(/\/$/, "");
+                                dirsToScan.push(dirPath);
+                            }
+
+                            if (dirsToScan.length === 0) {
+                                finalizeStaticScan();
+                                return;
+                            }
+
+                            let remaining = dirsToScan.length;
+
+                            dirsToScan.forEach(function (dirPath) {
+                                let subFiles = Qt.createQmlObject('import Qt.labs.folderlistmodel 1.0; FolderListModel {}', window);
+                                subFiles.folder = "file://" + dirPath;
+                                subFiles.showDirs = false;
+                                subFiles.showFiles = true;
+                                subFiles.nameFilters = ["*.jpg", "*.png", "*.jpeg", "*.gif", "*.webp"];
+
+                                subFiles.onStatusChanged.connect(function () {
+                                    if (subFiles.status !== FolderListModel.Ready)
+                                        return;
+
+                                    for (let k = 0; k < subFiles.count; k++) {
+                                        let filePath = stripFileScheme(subFiles.get(k, "filePath")).replace(/\/$/, "");
+                                        queueThumbnail(filePath);
+                                        let displayTitle = window.renamedTitles[filePath] || filePath.split("/").pop();
+                                        masterModel.append({
+                                            folder: filePath,
+                                            title: displayTitle,
+                                            originalTitle: filePath.split("/").pop(),
+                                            isStatic: true,
+                                            isFavorite: window.favorites.includes(filePath),
+                                            contentrating: "Everyone",
+                                            tags: "[]"
+                                        });
+                                    }
+
+                                    remaining--;
+                                    if (remaining === 0)
+                                        finalizeStaticScan();
+                                });
+                            });
                         });
                     });
                 });
