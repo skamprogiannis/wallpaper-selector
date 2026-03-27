@@ -89,6 +89,13 @@ Scope {
             property real playlistLastApplied: 0
             property var renamedTitles: ({})
             property string pendingScrollPath: ""
+            property int hoveredIndex: -1
+            property int previousHoveredIndex: -1
+            property int previousCurrentIndex: -1
+            property real cardWidth: 200
+            property real cardHeight: 360
+            property real cardScale: 1.2
+            property real cardSpacing: 20
 
             FileView {
                 id: pathCompleteFileView
@@ -242,7 +249,7 @@ Scope {
                 }
 
                 if (raw.startsWith(":") && !raw.includes(" ")) {
-                    let commands = [":static", ":dynamic", ":favorite", ":gif", ":rename", ":playlist", ":playlistshuffle", ":playlist clear", ":playlist up", ":playlist down", ":random", ":randomstatic", ":randomfav", ":export", ":setfolder", ":setstatic", ":setthumb", ":setffmpeg", ":clearcache", ":reload", ":tag", ":id", ":open", ":sort default", ":sort name", ":sort recent", ":sort favorite", ":sort random", ":help"];
+                    let commands = [":static", ":dynamic", ":favorite", ":gif", ":rename", ":playlist", ":playlistshuffle", ":playlist clear", ":playlist up", ":playlist down", ":width", ":height", ":spacing", ":scale", ":random", ":randomstatic", ":randomfav", ":export", ":setfolder", ":setstatic", ":setthumb", ":setffmpeg", ":clearcache", ":reload", ":tag", ":id", ":open", ":sort default", ":sort name", ":sort recent", ":sort favorite", ":sort random", ":help"];
                     suggestions = commands.filter(c => c.startsWith(lower) && c !== lower);
                     suggestionIndex = suggestions.length > 0 ? 0 : -1;
                     return;
@@ -355,6 +362,18 @@ Scope {
                 return filteredModel.get(listView.currentIndex);
             }
 
+            function setHoveredIndex(newIndex) {
+                if (hoveredIndex === newIndex)
+                    return
+                previousHoveredIndex = hoveredIndex
+                hoveredIndex = newIndex
+            }
+
+            function clearHoveredIndex(oldIndex) {
+                if (hoveredIndex === oldIndex)
+                    hoveredIndex = -1
+            }
+
             function applyWallpaper(item) {
                 if (!item || !item.folder)
                     return;
@@ -453,6 +472,10 @@ Scope {
                         window.toggleMatureContentKey = json.toggleMatureContentKey || "sus";
                         if (!window.toggleMatureContentKey || window.toggleMatureContentKey.trim() === "")
                             window.toggleMatureContentKey = "sus";
+                        window.cardWidth = json.width || 200;
+                        window.cardHeight = json.height || 360;
+                        window.cardSpacing = json.spacing || 20;
+                        window.cardScale = json.scale || 1.2;
                         window.playlist = json.playlist || [];
                         window.playlistInterval = json.playlistInterval || 30;
                         window.playlistActive = !!json.playlistActive;
@@ -477,6 +500,10 @@ Scope {
                     } catch (e) {
                         console.warn("Failed to parse settings:", e);
                         window.showMatureContent = false;
+                        window.cardWidth = 200;
+                        window.cardHeight = 360;
+                        window.cardSpacing = 20;
+                        window.cardScale = 1.2;
                         window.favorites = [];
                         window.playlist = [];
                         window.playlistActive = false;
@@ -509,6 +536,10 @@ Scope {
                 let jsonStr = JSON.stringify({
                     showMatureContent: window.showMatureContent,
                     toggleMatureContentKey: window.toggleMatureContentKey,
+                    width: window.cardWidth,
+                    height: window.cardHeight,
+                    spacing: window.cardSpacing,
+                    scale: window.cardScale,
                     playlist: window.playlist,
                     playlistInterval: window.playlistInterval,
                     playlistActive: window.playlist.length > 0 && window.playlistActive,
@@ -710,6 +741,66 @@ Scope {
                         searchInput.text = "";
                         window.suppressTextHandler = false;
                         searchDebounceTimer.stop();
+                        listView.forceActiveFocus();
+                        return;
+                    }
+
+                    if (cmd.startsWith(":width ")) {
+                        let width = parseInt(rawCmd.replace(/^:width\s+/i, "").trim());
+                        if (!isNaN(width) && width > 0) {
+                            window.cardWidth = width;
+                            saveSettings();
+                            filterWallpapersAnimation();
+                            showStatus("Card width set to " + width + "px");
+                        }
+                        window.suppressTextHandler = true;
+                        searchInput.text = "";
+                        window.suppressTextHandler = false;
+                        listView.forceActiveFocus();
+                        return;
+                    }
+
+                    if (cmd.startsWith(":height ")) {
+                        let height = parseInt(rawCmd.replace(/^:height\s+/i, "").trim());
+                        if (!isNaN(height) && height > 0) {
+                            window.cardHeight = height;
+                            saveSettings();
+                            filterWallpapersAnimation();
+                            showStatus("Card height set to " + height + "px");
+                        }
+                        window.suppressTextHandler = true;
+                        searchInput.text = "";
+                        window.suppressTextHandler = false;
+                        listView.forceActiveFocus();
+                        return;
+                    }
+
+                    if (cmd.startsWith(":scale ")) {
+                        let scale = parseFloat(rawCmd.replace(/^:scale\s+/i, "").trim());
+                        if (!isNaN(scale) && scale > 0) {
+                            window.cardScale = scale;
+                            saveSettings();
+                            filterWallpapersAnimation();
+                            showStatus("Card scale set to " + scale + "x");
+                        }
+                        window.suppressTextHandler = true;
+                        searchInput.text = "";
+                        window.suppressTextHandler = false;
+                        listView.forceActiveFocus();
+                        return;
+                    }
+
+                    if (cmd.startsWith(":spacing ")) {
+                        let spacing = parseInt(rawCmd.replace(/^:spacing\s+/i, "").trim());
+                        if (!isNaN(spacing) && spacing >= 0) {
+                            window.cardSpacing = spacing;
+                            saveSettings();
+                            filterWallpapersAnimation();
+                            showStatus("Card spacing set to " + spacing + "px");
+                        }
+                        window.suppressTextHandler = true;
+                        searchInput.text = "";
+                        window.suppressTextHandler = false;
                         listView.forceActiveFocus();
                         return;
                     }
@@ -1688,15 +1779,15 @@ Scope {
                             anchors.topMargin: 90
                             anchors.bottomMargin: 90
                             orientation: ListView.Horizontal
-                            spacing: 30
+                            spacing: window.cardSpacing
                             model: filteredModel
                             cacheBuffer: 300
                             highlightMoveDuration: 300
                             boundsBehavior: Flickable.StopAtBounds
                             highlightFollowsCurrentItem: true
                             highlight: Item {}
-                            preferredHighlightBegin: (width / 2) - 100
-                            preferredHighlightEnd: (width / 2) - 100
+                            preferredHighlightBegin: (width / 2) - (window.cardWidth / 2)
+                            preferredHighlightEnd: (width / 2) - (window.cardWidth / 2)
                             highlightRangeMode: ListView.StrictlyEnforceRange
 
                             NumberAnimation {
@@ -1712,8 +1803,8 @@ Scope {
 
                             delegate: Item {
                                 id: delegateRoot
-                                width: 200
-                                height: 360
+                                width: baseWidth
+                                height: baseHeight
 
                                 property bool isVisibleOnScreen: delegateRoot.ListView.view ? (x + width > ListView.view.contentX && x < ListView.view.contentX + ListView.view.width) : false
 
@@ -1728,9 +1819,13 @@ Scope {
                                     if (playlistPosition !== -1)
                                         lastValidPosition = playlistPosition;
                                 }
-                                property bool isCurrent: ListView.isCurrentItem
-                                property bool hovered: scaleMouseArea.containsMouse || favContainer.mouseOverFav
-                                property bool active: window.keyboardNavigation ? isCurrent : hovered
+                                property real baseWidth: window.cardWidth
+                                property real baseHeight: window.cardHeight
+                                property real activeScale: window.cardScale
+                                property int activeIndex: window.keyboardNavigation ? listView.currentIndex : window.hoveredIndex
+                                property bool hoverMode: !window.keyboardNavigation && window.hoveredIndex !== -1
+                                property bool hoverActive: hoverMode && index === window.hoveredIndex
+                                property bool active: window.keyboardNavigation ? index === activeIndex : hoverActive
 
                                 Item {
                                     id: scaleContainer
@@ -2032,8 +2127,15 @@ Scope {
                                     hoverEnabled: true
                                     propagateComposedEvents: true
                                     acceptedButtons: Qt.LeftButton
-                                    onEntered: window.anyHovered = true
-                                    onExited: window.anyHovered = false
+                                    onEntered: {
+                                        window.anyHovered = true
+                                        window.setHoveredIndex(index)
+                                    }
+                                    onExited: {
+                                        window.anyHovered = false
+                                        if (!favContainer.mouseOverFav)
+                                            Qt.callLater(() => window.clearHoveredIndex(index))
+                                    }
                                     onDoubleClicked: {
                                         if (!(mouse.modifiers & Qt.ShiftModifier)) {
                                             applyWallpaper(model);
@@ -2395,6 +2497,22 @@ Scope {
                             {
                                 cmd: ":playlistshuffle |  :pls",
                                 desc: "Makes playlist random"
+                            },
+                            {
+                                cmd: ":width <px>",
+                                desc: "Set card width in pixels"
+                            },
+                            {
+                                cmd: ":height <px>",
+                                desc: "Set card height in pixels"
+                            },
+                            {
+                                cmd: ":spacing <px>",
+                                desc: "Set card spacing in pixels"
+                            },
+                            {
+                                cmd: ":scale <factor>",
+                                desc: "Set hover/active scale factor"
                             },
                             {
                                 cmd: "Shift+Click / m  |    ",
