@@ -144,7 +144,7 @@ Scope {
                 id: playlistDaemon
                 Component.onCompleted: {
                     let home = stripFileScheme(StandardPaths.writableLocation(StandardPaths.HomeLocation));
-                    command = ["bash", "-c", `pgrep -fx 'bash.*wallpaper-playlist.sh' > /dev/null || { nohup ${home}/.local/bin/wallpaper-playlist.sh > /dev/null 2>&1 & disown; }`];
+                    command = ["bash", "-c", `pgrep -fx 'bash.*wallpaper-playlist' > /dev/null || { nohup ${home}/.local/bin/wallpaper-playlist > /dev/null 2>&1 & disown; }`];
                     startDetached();
                 }
             }
@@ -362,11 +362,12 @@ Scope {
                 let now = Date.now();
                 window.usageMap[folder] = now;
                 var home = stripFileScheme(StandardPaths.writableLocation(StandardPaths.HomeLocation));
-                var scriptPath = item.isStatic ? home + "/.local/bin/wallpaper-apply-static.sh" : home + "/.local/bin/wallpaper-apply.sh";
+                var scriptPath = home + "/.local/bin/wallpaper-apply";
+                var mode = item.isStatic ? "static" : "dynamic";
 
                 console.log("Applying wallpaper:", folder);
 
-                let args = ["bash", scriptPath,];
+                let args = [scriptPath, mode];
 
                 if (!item.isStatic) {
                     let cleanFolder = stripFileScheme(item.folder).replace(/\/$/, "");

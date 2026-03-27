@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 SETTINGS="$HOME/.config/quickshell/wallpaper/settings.json"
-APPLY_SCRIPT="$HOME/.local/bin/wallpaper-apply.sh"
-APPLY_STATIC="$HOME/.local/bin/wallpaper-apply-static.sh"
+APPLY_CMD="$HOME/.local/bin/wallpaper-apply"
 
 current_index=0
 last_count=0
@@ -96,9 +95,9 @@ while true; do
                 "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
 
             if [[ -d "$folder" ]]; then
-                bash "$APPLY_SCRIPT" "$folder"
+                bash "$APPLY_CMD" dynamic "$folder"
             elif [[ -f "$folder" ]]; then
-                bash "$APPLY_STATIC" "$folder"
+                bash "$APPLY_CMD" static "$folder"
             fi
 
             if [[ "$shuffle" != "true" ]]; then
