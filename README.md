@@ -32,7 +32,7 @@ For Nix users, prefer packaging/activation from your flake and run via your wrap
 - `/` enters search mode (slash-first search).
 - `:` enters command mode.
 - `h` / `l`: move selection left / right when search is not focused.
-- `f` (or `Ctrl+F`): toggle selected wallpaper as favorite.
+- `f`: toggle selected wallpaper as favorite.
 - `m`: toggle selected wallpaper in playlist queue.
 - `p`: start/stop playlist playback.
 - `J` / `K`: move selected queued item down / up.
@@ -40,6 +40,7 @@ For Nix users, prefer packaging/activation from your flake and run via your wrap
 - `Shift` + `Enter`: start/stop playlist when items exist.
 - `Enter` or double click: apply selected wallpaper.
 - `Esc` or clicking outside: close help/suggestions/window.
+- When help is open: `j` / `k` scroll line-by-line, `d` / `u` half-page, and `f` / `b` or `PgDn` / `PgUp` scroll a full page.
 
 ## Commands
 

@@ -97,6 +97,15 @@ Scope {
             property real cardScale: 1.2
             property real cardSpacing: 20
 
+            function scrollHelpBy(delta) {
+                if (!window.showHelp)
+                    return false;
+                let maxContentY = Math.max(0, helpListView.contentHeight - helpListView.height);
+                let nextContentY = Math.max(0, Math.min(maxContentY, helpListView.contentY + delta));
+                helpListView.contentY = nextContentY;
+                return true;
+            }
+
             FileView {
                 id: pathCompleteFileView
                 blockLoading: true
@@ -330,13 +339,33 @@ Scope {
             }
 
             function getWallpaperInfo(folderPath, callback) {
+                let cleanPath = stripFileScheme(folderPath).replace(/\/$/, "");
                 let jsonPath = folderPath + "/project.json";
                 var xhr = new XMLHttpRequest();
+                let settled = false;
+
+                function fallback() {
+                    if (settled)
+                        return;
+                    settled = true;
+                    callback({
+                        title: cleanPath.split("/").pop(),
+                        preview: "",
+                        contentrating: "Everyone",
+                        tags: []
+                    });
+                }
+
                 xhr.open("GET", jsonPath);
+                xhr.onerror = fallback;
+                xhr.onabort = fallback;
+                xhr.ontimeout = fallback;
+                xhr.timeout = 3000;
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState === XMLHttpRequest.DONE) {
                         try {
                             let json = JSON.parse(xhr.responseText);
+                            settled = true;
                             callback({
                                 title: String(json.title || "Untitled"),
                                 preview: json.preview || json.file || "",
@@ -344,11 +373,7 @@ Scope {
                                 tags: Array.isArray(json.tags) ? json.tags.map(t => String(t).toLowerCase()) : []
                             });
                         } catch (e) {
-                            let cleanPath = stripFileScheme(folderPath);
-                            callback({
-                                title: cleanPath.split("/").pop(),
-                                preview: ""
-                            });
+                            fallback();
                         }
                     }
                 };
@@ -356,10 +381,18 @@ Scope {
             }
 
             function getCurrentFilteredItem() {
-                if (listView.currentIndex < 0 || listView.currentIndex >= filteredModel.count)
+                let activeIndex = listView.currentIndex;
+
+                if (!window.keyboardNavigation && window.hoveredIndex >= 0 && window.hoveredIndex < filteredModel.count)
+                    activeIndex = window.hoveredIndex;
+
+                if (activeIndex < 0 && filteredModel.count > 0)
+                    activeIndex = 0;
+
+                if (activeIndex < 0 || activeIndex >= filteredModel.count)
                     return null;
 
-                return filteredModel.get(listView.currentIndex);
+                return filteredModel.get(activeIndex);
             }
 
             function setHoveredIndex(newIndex) {
@@ -386,7 +419,7 @@ Scope {
 
                 console.log("Applying wallpaper:", folder);
 
-                let args = [scriptPath, mode];
+                let args = ["bash", scriptPath, mode];
 
                 if (!item.isStatic) {
                     let cleanFolder = stripFileScheme(item.folder).replace(/\/$/, "");
@@ -1085,58 +1118,30 @@ Scope {
             function scanWallpapers() {
                 console.log("Scanning:", baseFolder);
 
-                var folders = Qt.createQmlObject('import Qt.labs.folderlistmodel 1.0; FolderListModel {}', window);
-                folders.folder = "file://" + baseFolder;
-                folders.showDirs = true;
-                folders.showFiles = false;
+                masterModel.clear();
+                filteredModel.clear();
 
-                folders.onStatusChanged.connect(function () {
-                    if (folders.status !== FolderListModel.Ready)
-                        return;
-                    masterModel.clear();
-
-                    for (let i = 0; i < folders.count; i++) {
-                        let folderPath = folders.get(i, "filePath");
-                        let cleanPath = stripFileScheme(folderPath);
-
-                        masterModel.append({
-                            folder: folderPath,
-                            title: "Error! Fix project file.",
-                            originalTitle: "",
-                            preview: "",
-                            isStatic: false,
-                            isFavorite: window.favorites.includes(cleanPath),
-                            tags: "[]",
-                            hash: Qt.md5(cleanPath)
-                        });
-
-                        let index = masterModel.count - 1;
-
-                        getWallpaperInfo(folderPath, function (data) {
-                            let cleanPath = stripFileScheme(folderPath);
-                            let displayTitle = window.renamedTitles[cleanPath] || data.title;
-                            masterModel.setProperty(index, "title", displayTitle);
-                            masterModel.setProperty(index, "originalTitle", data.title);
-                            masterModel.setProperty(index, "preview", data.preview);
-                            masterModel.setProperty(index, "contentrating", data.contentrating || "Everyone");
-                            masterModel.setProperty(index, "tags", JSON.stringify(data.tags || []));
-
-                            if (data.preview && data.preview !== "") {
-                                let fullPath = stripFileScheme(folderPath) + "/" + data.preview;
-                                queueThumbnail(fullPath);
-                            }
-                        });
-                    }
-
+                function scanStaticWallpapers() {
                     var staticFiles = Qt.createQmlObject('import Qt.labs.folderlistmodel 1.0; FolderListModel {}', window);
                     staticFiles.folder = "file://" + staticWallpaperFolder;
                     staticFiles.showDirs = false;
                     staticFiles.showFiles = true;
                     staticFiles.nameFilters = ["*.jpg", "*.png", "*.jpeg", "*.gif", "*.webp"];
 
-                    staticFiles.onStatusChanged.connect(function () {
+                    var staticProcessed = false;
+                    var staticReady = false;
+                    function processStaticFiles() {
+                        if (staticProcessed)
+                            return;
                         if (staticFiles.status !== FolderListModel.Ready)
                             return;
+                        if (!staticReady) {
+                            staticReady = true;
+                            if (staticFiles.count === 0)
+                                return;
+                        }
+                        staticProcessed = true;
+
                         for (let i = 0; i < staticFiles.count; i++) {
                             let filePath = stripFileScheme(staticFiles.get(i, "filePath")).replace(/\/$/, "");
 
@@ -1152,17 +1157,158 @@ Scope {
                                 tags: "[]"
                             });
                         }
-                        Qt.callLater(() => {
-                            cleanupThumbnails(window.validThumbs);
-                        });
-                        filterWallpapers();
 
-                        Qt.callLater(() => {
-                            initialFadeIn.start();
-                            window.isInitialLoad = false;
+                        function finalizeStaticScan() {
+                            Qt.callLater(() => { cleanupThumbnails(window.validThumbs); });
+                            filterWallpapers();
+                            Qt.callLater(() => { initialFadeIn.start(); window.isInitialLoad = false; });
+                        }
+
+                        var subDirs = Qt.createQmlObject('import Qt.labs.folderlistmodel 1.0; FolderListModel {}', window);
+                        subDirs.folder = "file://" + staticWallpaperFolder;
+                        subDirs.showDirs = true;
+                        subDirs.showFiles = false;
+                        subDirs.showHidden = false;
+
+                        subDirs.onStatusChanged.connect(function () {
+                            if (subDirs.status !== FolderListModel.Ready)
+                                return;
+
+                            let dirsToScan = [];
+                            for (let j = 0; j < subDirs.count; j++) {
+                                let dirPath = stripFileScheme(subDirs.get(j, "filePath")).replace(/\/$/, "");
+                                dirsToScan.push(dirPath);
+                            }
+
+                            if (dirsToScan.length === 0) {
+                                finalizeStaticScan();
+                                return;
+                            }
+
+                            let remaining = dirsToScan.length;
+
+                            dirsToScan.forEach(function (dirPath) {
+                                let subFiles = Qt.createQmlObject('import Qt.labs.folderlistmodel 1.0; FolderListModel {}', window);
+                                subFiles.folder = "file://" + dirPath;
+                                subFiles.showDirs = false;
+                                subFiles.showFiles = true;
+                                subFiles.nameFilters = ["*.jpg", "*.png", "*.jpeg", "*.gif", "*.webp"];
+
+                                subFiles.onStatusChanged.connect(function () {
+                                    if (subFiles.status !== FolderListModel.Ready)
+                                        return;
+
+                                    for (let k = 0; k < subFiles.count; k++) {
+                                        let filePath = stripFileScheme(subFiles.get(k, "filePath")).replace(/\/$/, "");
+                                        queueThumbnail(filePath);
+                                        let displayTitle = window.renamedTitles[filePath] || filePath.split("/").pop();
+                                        masterModel.append({
+                                            folder: filePath,
+                                            title: displayTitle,
+                                            originalTitle: filePath.split("/").pop(),
+                                            isStatic: true,
+                                            isFavorite: window.favorites.includes(filePath),
+                                            contentrating: "Everyone",
+                                            tags: "[]"
+                                        });
+                                    }
+
+                                    remaining--;
+                                    if (remaining === 0)
+                                        finalizeStaticScan();
+                                });
+                            });
                         });
+                    }
+
+                    staticFiles.onStatusChanged.connect(function () {
+                        processStaticFiles();
+                        if (!staticProcessed && staticFiles.status === FolderListModel.Ready && staticFiles.count === 0) {
+                            Qt.callLater(function () {
+                                if (!staticProcessed) {
+                                    staticProcessed = true;
+                                    filterWallpapers();
+                                    Qt.callLater(() => { initialFadeIn.start(); window.isInitialLoad = false; });
+                                }
+                            });
+                        }
                     });
-                });
+                    staticFiles.onCountChanged.connect(processStaticFiles);
+                }
+
+                scanStaticWallpapers();
+
+                var folders = Qt.createQmlObject('import Qt.labs.folderlistmodel 1.0; FolderListModel {}', window);
+                folders.folder = "file://" + baseFolder;
+                folders.showDirs = true;
+                folders.showFiles = false;
+
+                var dynamicProcessed = false;
+                var dynamicReady = false;
+                function processDynamicFolders() {
+                    if (dynamicProcessed)
+                        return;
+                    if (folders.status !== FolderListModel.Ready)
+                        return;
+                    if (!dynamicReady) {
+                        dynamicReady = true;
+                        if (folders.count === 0)
+                            return;
+                    }
+
+                    dynamicProcessed = true;
+
+                    for (let i = 0; i < folders.count; i++) {
+                        let folderPath = folders.get(i, "filePath");
+                        let cleanPath = stripFileScheme(folderPath).replace(/\/$/, "");
+                        let fallbackTitle = cleanPath.split("/").pop();
+
+                        masterModel.append({
+                            folder: cleanPath,
+                            title: window.renamedTitles[cleanPath] || fallbackTitle,
+                            originalTitle: fallbackTitle,
+                            preview: "",
+                            isStatic: false,
+                            isFavorite: window.favorites.includes(cleanPath),
+                            contentrating: "Everyone",
+                            tags: "[]",
+                            hash: Qt.md5(cleanPath)
+                        });
+
+                        let index = masterModel.count - 1;
+
+                        getWallpaperInfo(folderPath, function (data) {
+                            let displayTitle = window.renamedTitles[cleanPath] || data.title;
+                            masterModel.setProperty(index, "title", displayTitle);
+                            masterModel.setProperty(index, "originalTitle", data.title);
+                            masterModel.setProperty(index, "preview", data.preview);
+                            masterModel.setProperty(index, "contentrating", data.contentrating || "Everyone");
+                            masterModel.setProperty(index, "tags", JSON.stringify(data.tags || []));
+
+                            // Propagate to filteredModel (it's a copy, not a view)
+                            for (let j = 0; j < filteredModel.count; j++) {
+                                if (filteredModel.get(j).folder === cleanPath) {
+                                    filteredModel.setProperty(j, "title", displayTitle);
+                                    filteredModel.setProperty(j, "originalTitle", data.title);
+                                    filteredModel.setProperty(j, "preview", data.preview);
+                                    filteredModel.setProperty(j, "contentrating", data.contentrating || "Everyone");
+                                    filteredModel.setProperty(j, "tags", JSON.stringify(data.tags || []));
+                                    break;
+                                }
+                            }
+
+                            if (data.preview && data.preview !== "") {
+                                let fullPath = cleanPath + "/" + data.preview;
+                                queueThumbnail(fullPath);
+                            }
+                        });
+                    }
+
+                    filterWallpapers();
+                }
+
+                folders.onStatusChanged.connect(processDynamicFolders);
+                folders.onCountChanged.connect(processDynamicFolders);
             }
             Component.onCompleted: {
                 let path = Qt.resolvedUrl("settings.json").toString().replace(/^file:\/\//, "");
@@ -1448,6 +1594,48 @@ Scope {
                     Component.onCompleted: listView.forceActiveFocus()
 
                     Keys.onPressed: event => {
+                        if (window.showHelp) {
+                            const lineStep = 36;
+                            const halfPageStep = Math.max(lineStep * 3, helpListView.height * 0.5);
+                            const fullPageStep = Math.max(lineStep * 6, helpListView.height * 0.9);
+
+                            if (event.key === Qt.Key_J || event.key === Qt.Key_Down) {
+                                scrollHelpBy(lineStep);
+                                event.accepted = true;
+                                return;
+                            }
+
+                            if (event.key === Qt.Key_K || event.key === Qt.Key_Up) {
+                                scrollHelpBy(-lineStep);
+                                event.accepted = true;
+                                return;
+                            }
+
+                            if (event.key === Qt.Key_D) {
+                                scrollHelpBy(halfPageStep);
+                                event.accepted = true;
+                                return;
+                            }
+
+                            if (event.key === Qt.Key_U) {
+                                scrollHelpBy(-halfPageStep);
+                                event.accepted = true;
+                                return;
+                            }
+
+                            if (event.key === Qt.Key_F || event.key === Qt.Key_PageDown) {
+                                scrollHelpBy(fullPageStep);
+                                event.accepted = true;
+                                return;
+                            }
+
+                            if (event.key === Qt.Key_B || event.key === Qt.Key_PageUp) {
+                                scrollHelpBy(-fullPageStep);
+                                event.accepted = true;
+                                return;
+                            }
+                        }
+
                         if (event.matches(StandardKey.Paste)) {
                             searchInput.visible = true;
                             Qt.callLater(() => {
@@ -1459,42 +1647,8 @@ Scope {
                             return;
                         }
 
-                        if (event.key === Qt.Key_F && (event.modifiers & Qt.ControlModifier)) {
-                            let item = getCurrentFilteredItem();
-                            if (!item)
-                                return;
-                            let path = stripFileScheme(item.folder);
-
-                            for (let i = 0; i < masterModel.count; i++) {
-                                let mItem = masterModel.get(i);
-                                if (stripFileScheme(mItem.folder) === path) {
-                                    mItem.isFavorite = !mItem.isFavorite;
-
-                                    if (mItem.isFavorite) {
-                                        if (!window.favorites.includes(path))
-                                            window.favorites.push(path);
-                                    } else {
-                                        let idx = window.favorites.indexOf(path);
-                                        if (idx !== -1)
-                                            window.favorites.splice(idx, 1);
-                                    }
-
-                                    saveSettings();
-                                    break;
-                                }
-                            }
-
-                            item.isFavorite = !item.isFavorite;
-                            showStatus(item.isFavorite ? "Added to favorites" : "Removed from favorites");
-                            event.accepted = true;
+                        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
                             return;
-                        }
-
-                        if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) {
-                            if (!(event.key === Qt.Key_F && (event.modifiers & Qt.ControlModifier))) {
-                                return;
-                            }
-                        }
                         if (!searchInput.activeFocus && !window.showHelp) {
                             if (event.key === Qt.Key_Slash) {
                                 searchInput.visible = true;
@@ -2128,6 +2282,7 @@ Scope {
                                     propagateComposedEvents: true
                                     acceptedButtons: Qt.LeftButton
                                     onEntered: {
+                                        window.keyboardNavigation = false
                                         window.anyHovered = true
                                         window.setHoveredIndex(index)
                                     }
@@ -2160,6 +2315,9 @@ Scope {
                                                 window.playlistActive = false;
                                             }
                                             saveSettings();
+                                        } else {
+                                            window.keyboardNavigation = false;
+                                            window.setHoveredIndex(index);
                                         }
                                     }
                                 }
@@ -2438,13 +2596,17 @@ Scope {
                         anchors.bottom: parent.bottom
                         anchors.bottomMargin: 16
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Esc / Enter to close"
+                        width: parent.width - 48
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        text: "j/k scroll · d/u half-page · f/b or PgUp/PgDn page · Esc / Enter close"
                         color: Theme.text
                         font.pixelSize: 12
                         opacity: 0.4
                     }
 
                     ListView {
+                        id: helpListView
                         anchors.top: helpTitle.bottom
                         anchors.bottom: helpFooter.top
                         anchors.left: parent.left
@@ -2527,7 +2689,7 @@ Scope {
                                 desc: "Move selection left/right"
                             },
                             {
-                                cmd: "f / Ctrl+F      |    ",
+                                cmd: "f               |    ",
                                 desc: "Toggle favorite for selected wallpaper"
                             },
                             {
